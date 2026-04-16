@@ -2,6 +2,8 @@
 
 require('dotenv').config();
 
+const { ResultStore } = require('./shared/store');
+
 const TEST_SCRAPER = process.env.TEST_SCRAPER || 'gmaps-full';
 
 // ─── Test inputs per scraper ─────────────────────────────────────────────────
@@ -26,13 +28,6 @@ const TEST_INPUTS = {
   },
 };
 
-// ─── Result collector ─────────────────────────────────────────────────────────
-
-const results = [];
-async function pushResult(record) {
-  results.push(record);
-}
-
 // ─── Run selected scraper ─────────────────────────────────────────────────────
 
 async function main() {
@@ -44,8 +39,15 @@ async function main() {
     process.exit(1);
   }
 
-  const { run } = require(`./actors/${TEST_SCRAPER}/main`);
+  // Store loads existing records from results/<scraper>.json and builds dedup index
+  const store = new ResultStore(TEST_SCRAPER);
+  const savedBefore = store.count;
 
+  async function pushResult(record) {
+    store.push(record); // silently drops duplicates
+  }
+
+  const { run } = require(`./actors/${TEST_SCRAPER}/main`);
   const startMs = Date.now();
 
   try {
@@ -57,19 +59,27 @@ async function main() {
   }
 
   const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
+  const newRecords = store.count - savedBefore;
 
-  // ─── Print results table ────────────────────────────────────────────────────
-  console.log(`\n=== Results (${results.length} records in ${elapsed}s) ===\n`);
+  // ─── Print results table (new records only) ────────────────────────────────
+  console.log(`\n=== Session summary (${elapsed}s) ===`);
+  console.log(`  New records saved : ${newRecords}`);
+  console.log(`  Duplicates skipped: ${store.skipped}`);
+  console.log(`  Total in store    : ${store.count}`);
+  console.log(`  Saved to          : results/${TEST_SCRAPER}.json\n`);
 
-  if (results.length === 0) {
-    console.log('No results returned.');
+  const allRecords = store.getAll();
+  const sessionRecords = allRecords.slice(savedBefore); // only rows added this run
+
+  if (sessionRecords.length === 0) {
+    console.log('No new records this run.\n');
     return;
   }
 
   // Use first record's keys as column headers
-  const keys = Object.keys(results[0]);
+  const keys = Object.keys(sessionRecords[0]);
   const colWidths = keys.map((k) =>
-    Math.min(30, Math.max(k.length, ...results.map((r) => String(r[k] ?? '').length)))
+    Math.min(30, Math.max(k.length, ...sessionRecords.map((r) => String(r[k] ?? '').length)))
   );
 
   const header = keys.map((k, i) => k.padEnd(colWidths[i])).join('  ');
@@ -78,7 +88,7 @@ async function main() {
   console.log(header);
   console.log(divider);
 
-  for (const row of results) {
+  for (const row of sessionRecords) {
     const line = keys
       .map((k, i) => String(row[k] ?? '').slice(0, colWidths[i]).padEnd(colWidths[i]))
       .join('  ');

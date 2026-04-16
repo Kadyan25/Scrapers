@@ -3,6 +3,7 @@ node_modules/
 .apify_storage/
 apify_storage/
 storage/
+results/
 *.log
 .DS_Store
 SESSION.md
