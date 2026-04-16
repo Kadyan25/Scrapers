@@ -2,81 +2,100 @@
 
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const { launchLocal, launchApify } = require('../../shared/browser');
-const { searchMaps, scrollResults, extractListingBasic, clickListing, extractListingDetail } = require('../../shared/gmapsNavigator');
+const { launchLocal, launchApify, newContext } = require('../../shared/browser');
+const { searchMaps, scrollResults, collectCardData, navigateToListing, extractListingDetail } = require('../../shared/gmapsNavigator');
 const { scrapeEmailFromWebsite } = require('../../shared/websiteScraper');
 const { humanDelay } = require('../../shared/delays');
 
 /**
  * Run the GMaps Full scraper.
- * @param {object} input
- * @param {string}   input.query       — e.g. "auto body shop Brooklyn NY"
- * @param {string[]} [input.geoTiles]  — array of queries for geo-tiling
+ *
+ * Phase 1 — search + scroll on the list page, collect basic data + place URLs.
+ * Phase 2 — navigate directly to each place URL for detail extraction.
+ *
+ * Direct navigation avoids stale locator issues that occur when clicking
+ * cards after the search page has navigated away.
+ *
+ * @param {object}   input
+ * @param {string}   input.query
+ * @param {string[]} [input.geoTiles]
  * @param {number}   [input.maxResults=120]
- * @param {Function} pushResult        — callback(record) to store output
- * @param {string}   [proxyUrl]        — Apify proxy URL; omit for local runs
+ * @param {Function} pushResult
+ * @param {string}   [proxyUrl]
  */
 async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) {
   const queries = geoTiles && geoTiles.length > 0 ? geoTiles : [query];
-  const seen = new Set(); // deduplicate by name+address
+  const seen = new Set(); // within-run dedup by name
 
   const browser = proxyUrl ? await launchApify(proxyUrl) : await launchLocal();
 
   try {
     for (const q of queries) {
       console.log(`[gmaps-full] Searching: ${q}`);
-      const { page, context } = await searchMaps(q, browser);
+
+      // ── Phase 1: collect card data from the list page ──────────────────────
+      const { page: listPage, context: listContext } = await searchMaps(q, browser);
 
       let listings;
       try {
-        listings = await scrollResults(page);
+        listings = await scrollResults(listPage);
       } catch (err) {
         console.warn(`[gmaps-full] scrollResults failed for "${q}": ${err.message}`);
-        await context.close();
+        await listContext.close();
         continue;
       }
 
-      const limit = Math.min(listings.length, maxResults);
-      console.log(`[gmaps-full] Found ${listings.length} listings, processing up to ${limit}`);
+      console.log(`[gmaps-full] Found ${listings.length} listings, collecting up to ${maxResults}`);
+      const cardData = await collectCardData(listings, maxResults);
+      await listContext.close(); // list page no longer needed
 
-      for (let i = 0; i < limit; i++) {
-        try {
-          const basic = await extractListingBasic(listings[i]);
-          const dedupeKey = `${basic.name}|${basic.category}`;
-          if (seen.has(dedupeKey)) continue;
-          seen.add(dedupeKey);
+      // ── Phase 2: navigate to each place URL for detail ─────────────────────
+      const detailContext = await newContext(browser);
+      const detailPage = await detailContext.newPage();
 
-          await clickListing(listings[i], page);
-          const detail = await extractListingDetail(page);
+      try {
+        for (let i = 0; i < cardData.length; i++) {
+          const { basic, href } = cardData[i];
+          if (!href) continue;
 
-          let email = null;
-          if (detail.website) {
-            email = await scrapeEmailFromWebsite(detail.website, browser);
+          try {
+            const dedupeKey = `${basic.name}|${basic.category}`;
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
+
+            await navigateToListing(href, detailPage);
+            const detail = await extractListingDetail(detailPage);
+
+            let email = null;
+            if (detail.website) {
+              email = await scrapeEmailFromWebsite(detail.website, browser);
+            }
+
+            const record = {
+              name: basic.name || detail.name,
+              phone: detail.phone,
+              address: detail.address,
+              website: detail.website,
+              email,
+              category: basic.category,
+              rating: basic.rating,
+              reviewCount: detail.reviewCount,
+              hasEmail: !!email,
+              scrapedAt: new Date().toISOString(),
+            };
+
+            await pushResult(record);
+            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${record.name}`);
+
+            await humanDelay(800, 1500);
+          } catch (err) {
+            console.warn(`[gmaps-full] Listing ${i + 1} failed: ${err.message}`);
           }
-
-          const record = {
-            name: basic.name || detail.name,
-            phone: detail.phone,
-            address: detail.address,
-            website: detail.website,
-            email,
-            category: basic.category,
-            rating: basic.rating,
-            reviewCount: detail.reviewCount,
-            hasEmail: !!email,
-            scrapedAt: new Date().toISOString(),
-          };
-
-          await pushResult(record);
-          console.log(`[gmaps-full] ${i + 1}/${limit} — ${record.name}`);
-
-          await humanDelay(800, 1800);
-        } catch (err) {
-          console.warn(`[gmaps-full] Listing ${i} failed: ${err.message}`);
         }
+      } finally {
+        await detailContext.close();
       }
 
-      await context.close();
       await humanDelay(1500, 3000);
     }
   } finally {

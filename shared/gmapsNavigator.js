@@ -19,7 +19,6 @@ async function searchMaps(query, browser) {
   });
   await pageLoadDelay();
 
-  // Wait for the results list or a single listing detail to appear
   await page
     .waitForSelector('[role="feed"], [data-item-id="address"]', { timeout: 15000 })
     .catch(() => {});
@@ -28,8 +27,8 @@ async function searchMaps(query, browser) {
 }
 
 /**
- * Scroll the left results panel until no new listings load or max 120 reached.
- * Returns an array of Locators, one per result card.
+ * Scroll the results panel until stable or 120 listings loaded.
+ * Returns an array of Locators, one per card.
  */
 async function scrollResults(page) {
   const feed = page.locator('[role="feed"]');
@@ -50,7 +49,6 @@ async function scrollResults(page) {
       stableRounds = 0;
     }
 
-    // Check for end-of-list marker
     const endMarker = await page
       .locator("text=/You've reached the end of the list/i")
       .count();
@@ -63,19 +61,39 @@ async function scrollResults(page) {
 }
 
 /**
+ * Walk all result cards and collect { basic, href } while the list page is
+ * still open. Call this before closing the search context.
+ *
+ * @param {import('playwright').Locator[]} listings
+ * @param {number} limit
+ * @returns {Promise<Array<{ basic: object, href: string|null }>>}
+ */
+async function collectCardData(listings, limit) {
+  const results = [];
+  for (let i = 0; i < Math.min(listings.length, limit); i++) {
+    const card = listings[i];
+    const basic = await extractListingBasic(card);
+    const href = await card
+      .locator('a.hfpxzc')
+      .first()
+      .getAttribute('href')
+      .catch(() => null);
+    results.push({ basic, href });
+  }
+  return results;
+}
+
+/**
  * Extract basic info from a result card in the list panel.
  * @param {import('playwright').Locator} card
  * @returns {{ name, hasWebsite, rating, category }}
  */
 async function extractListingBasic(card) {
-  // Name — article's own aria-label is the most stable source
   const name = await card.getAttribute('aria-label').catch(() => null);
 
-  // Website indicator — card has a "Visit … website" link when one exists
   const hasWebsite =
     (await card.locator('a[aria-label^="Visit"]').count()) > 0;
 
-  // Rating — "4.6 stars" in the aria-label
   const ratingLabel = await card
     .locator('span[role="img"][aria-label*="stars"]')
     .first()
@@ -85,7 +103,6 @@ async function extractListingBasic(card) {
     ? parseFloat(ratingLabel.match(/[\d.]+/)?.[0]) || null
     : null;
 
-  // Category — first non-numeric, non-separator text inside .W4Efsd spans
   const w4Texts = await card
     .locator('.W4Efsd span span')
     .allTextContents()
@@ -104,57 +121,33 @@ async function extractListingBasic(card) {
 }
 
 /**
- * Click a result card and wait for the detail panel to load.
- * Captures the current address first so we can detect when the panel updates.
- * @param {import('playwright').Locator} card
+ * Navigate a page directly to a place URL and wait for the detail panel.
+ * Using direct navigation (instead of click) avoids stale locator issues
+ * when iterating through many listings.
+ *
+ * @param {string} href  — the place URL from a.hfpxzc
  * @param {import('playwright').Page} page
  */
-async function clickListing(card, page) {
-  // Snapshot the current address so we know when the new listing has loaded
-  const prevAddress = await page
-    .locator('[data-item-id="address"]')
-    .first()
-    .textContent()
-    .catch(() => '');
-
-  await card.locator('a.hfpxzc').first().click();
-  await humanDelay(800, 1500);
-
-  if (prevAddress.trim()) {
-    // Wait until the address text changes — guarantees the panel refreshed
-    await page
-      .waitForFunction(
-        (prev) => {
-          const el = document.querySelector('[data-item-id="address"]');
-          return el && el.textContent.trim() !== prev;
-        },
-        prevAddress.trim(),
-        { timeout: 15000 }
-      )
-      .catch(() => {});
-  } else {
-    // First listing — just wait for the element to appear
-    await page
-      .waitForSelector('[data-item-id="address"]', { timeout: 12000 })
-      .catch(() => {});
-  }
-
-  await humanDelay(400, 800); // brief settle after panel loads
+async function navigateToListing(href, page) {
+  await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page
+    .waitForSelector('[data-item-id="address"]', { timeout: 12000 })
+    .catch(() => {});
+  await humanDelay(300, 600);
 }
 
 /**
  * Extract fields from the open detail panel.
- * Uses data-item-id attribute selectors throughout — no class names.
+ * Uses data-item-id attribute selectors — no class names.
  * @returns {{ name, phone, address, website, reviewCount, hours }}
  */
 async function extractListingDetail(page) {
-  // Name — page title is "[Business Name] - Google Maps" for place pages
+  // Name from page title: "[Business Name] - Google Maps"
   const pageTitle = await page.title().catch(() => '');
   const name = pageTitle
     ? pageTitle.replace(/\s*[-–—]\s*Google Maps.*$/i, '').trim() || null
     : null;
 
-  // Review count — available in the detail panel as "371 reviews" aria-label
   const reviewLabel = await page
     .locator('span[aria-label$=" reviews"]')
     .first()
@@ -164,7 +157,6 @@ async function extractListingDetail(page) {
     ? parseInt(reviewLabel.replace(/\D/g, ''), 10) || null
     : null;
 
-  // Phone — data-item-id starts with "phone:"
   const phoneEl = page.locator('[data-item-id^="phone:"]').first();
   const phoneAriaLabel = await phoneEl.getAttribute('aria-label').catch(() => null);
   const rawPhone = phoneAriaLabel
@@ -172,19 +164,16 @@ async function extractListingDetail(page) {
     : await phoneEl.textContent().catch(() => null);
   const phone = cleanPhone(rawPhone) || null;
 
-  // Address — aria-label has "Address: …" prefix
   const addressEl = page.locator('[data-item-id="address"]').first();
   const addressLabel = await addressEl.getAttribute('aria-label').catch(() => null);
   const address = addressLabel
     ? addressLabel.replace(/^Address:\s*/i, '').trim()
     : await addressEl.textContent().catch(() => null);
 
-  // Website — authority link href
   const websiteEl = page.locator('a[data-item-id="authority"]').first();
   const websiteHref = await websiteEl.getAttribute('href').catch(() => null);
   const website = isValidUrl(websiteHref) ? websiteHref : null;
 
-  // Hours — not always present
   const hoursEl = page
     .locator('[data-item-id*="oh"] [aria-label*="hour" i], button[aria-expanded][aria-label*="hour" i]')
     .first();
@@ -200,4 +189,11 @@ async function extractListingDetail(page) {
   };
 }
 
-module.exports = { searchMaps, scrollResults, extractListingBasic, clickListing, extractListingDetail };
+module.exports = {
+  searchMaps,
+  scrollResults,
+  collectCardData,
+  extractListingBasic,
+  navigateToListing,
+  extractListingDetail,
+};

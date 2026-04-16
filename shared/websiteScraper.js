@@ -106,14 +106,15 @@ async function scrapePhoneFromWebsite(url, browser) {
   }
 
   // Standard website crawl
+  // No pageLoadDelay() here — business websites won't rate-limit us.
+  // The page.goto() call itself + domcontentloaded provides enough settling time.
   const context = await newContext(browser);
   const page = await context.newPage();
   try {
     const base = url.replace(/\/$/, '');
     for (const path of CONTACT_PATHS) {
       try {
-        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await pageLoadDelay();
+        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 12000 });
 
         const telLinks = await page.$$eval('a[href^="tel:"]', (links) =>
           links.map((a) => a.href.replace('tel:', '').trim())
@@ -125,8 +126,6 @@ async function scrapePhoneFromWebsite(url, browser) {
 
         const phones = extractPhones(await page.evaluate(() => document.body.innerText));
         if (phones.length > 0) return phones[0];
-
-        await humanDelay(400, 900);
       } catch { /* page failed to load — try next path */ }
     }
   } finally {
@@ -164,8 +163,7 @@ async function scrapeEmailFromWebsite(url, browser) {
     const base = url.replace(/\/$/, '');
     for (const path of CONTACT_PATHS) {
       try {
-        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 15000 });
-        await pageLoadDelay();
+        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 12000 });
 
         const mailtoLinks = await page.$$eval('a[href^="mailto:"]', (links) =>
           links.map((a) => a.href.replace('mailto:', '').split('?')[0].trim())
@@ -177,8 +175,6 @@ async function scrapeEmailFromWebsite(url, browser) {
 
         const emails = extractEmails(await page.evaluate(() => document.body.innerText));
         if (emails.length > 0) return emails[0];
-
-        await humanDelay(400, 900);
       } catch { /* page failed to load — try next path */ }
     }
   } finally {
