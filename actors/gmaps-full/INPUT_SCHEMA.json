@@ -1,0 +1,30 @@
+{
+  "title": "GMaps Full Scraper Input",
+  "description": "Search Google Maps and extract full business details including email.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search Query",
+      "type": "string",
+      "description": "Google Maps search query, e.g. 'auto body shop Brooklyn NY'",
+      "editor": "textfield"
+    },
+    "geoTiles": {
+      "title": "Geo Tiles",
+      "type": "array",
+      "description": "Optional array of search queries for geo-tiling (overrides query when provided)",
+      "editor": "stringList"
+    },
+    "maxResults": {
+      "title": "Max Results",
+      "type": "integer",
+      "description": "Maximum number of listings to process per query (max 120)",
+      "default": 120,
+      "minimum": 1,
+      "maximum": 120,
+      "editor": "number"
+    }
+  },
+  "required": ["query"]
+}

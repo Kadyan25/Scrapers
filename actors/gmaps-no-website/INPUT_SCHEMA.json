@@ -1,0 +1,30 @@
+{
+  "title": "GMaps No-Website Scraper Input",
+  "description": "Search Google Maps and return only listings that have no website — high-intent leads.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search Query",
+      "type": "string",
+      "description": "Google Maps search query, e.g. 'plumber Queens NY'",
+      "editor": "textfield"
+    },
+    "geoTiles": {
+      "title": "Geo Tiles",
+      "type": "array",
+      "description": "Optional array of search queries for geo-tiling (overrides query when provided)",
+      "editor": "stringList"
+    },
+    "maxResults": {
+      "title": "Max Results",
+      "type": "integer",
+      "description": "Maximum number of listings to scan per query (max 120)",
+      "default": 120,
+      "minimum": 1,
+      "maximum": 120,
+      "editor": "number"
+    }
+  },
+  "required": ["query"]
+}

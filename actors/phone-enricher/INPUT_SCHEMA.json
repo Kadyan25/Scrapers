@@ -1,0 +1,32 @@
+{
+  "title": "Phone Enricher Input",
+  "description": "Enrich a list of businesses with phone numbers via cascade lookup (website → GMaps → Google Search).",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "records": {
+      "title": "Records",
+      "type": "array",
+      "description": "Array of business records. Each record needs at least one of: businessName, website, or email.",
+      "editor": "json",
+      "items": {
+        "type": "object",
+        "properties": {
+          "businessName": {
+            "type": "string",
+            "description": "Business name for GMaps and Google Search lookup"
+          },
+          "website": {
+            "type": "string",
+            "description": "Business website URL for direct scraping"
+          },
+          "email": {
+            "type": "string",
+            "description": "Business email (preserved in output, not used for lookup)"
+          }
+        }
+      }
+    }
+  },
+  "required": ["records"]
+}

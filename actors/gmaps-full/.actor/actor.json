@@ -1,0 +1,10 @@
+{
+  "actorSpecification": 1,
+  "name": "gmaps-full",
+  "title": "GMaps Full Scraper",
+  "description": "Search Google Maps and extract name, phone, address, email, website, category, and rating for each listing.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "environmentVariables": [],
+  "dockerfile": "./Dockerfile"
+}

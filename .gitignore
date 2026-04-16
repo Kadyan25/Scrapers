@@ -1,0 +1,10 @@
+node_modules/
+.env
+.apify_storage/
+apify_storage/
+storage/
+*.log
+.DS_Store
+SESSION.md
+ISSUES.md
+CLAUDE.md

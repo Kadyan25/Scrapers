@@ -1,0 +1,10 @@
+{
+  "actorSpecification": 1,
+  "name": "gmaps-no-website",
+  "title": "GMaps No-Website Scraper",
+  "description": "Search Google Maps and return only listings with no website — high-intent local business leads.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "environmentVariables": [],
+  "dockerfile": "./Dockerfile"
+}
