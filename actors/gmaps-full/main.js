@@ -96,11 +96,13 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
               scrapedAt: new Date().toISOString(),
             };
 
-            // Fire website scraping in background — runs while we humanDelay
-            // + navigate to the next listing
-            pendingEmail = detail.website
-              ? scrapeEmailFromWebsite(detail.website, browser).catch(() => null)
-              : Promise.resolve(null);
+            // Skip website scraping if email already found on the Maps page.
+            // Only crawl the website as a fallback when Maps has no email.
+            pendingEmail = detail.email
+              ? Promise.resolve(detail.email)
+              : detail.website
+                ? scrapeEmailFromWebsite(detail.website, browser).catch(() => null)
+                : Promise.resolve(null);
 
             console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${pendingRecord.name}`);
             await humanDelay(800, 1500);

@@ -2,7 +2,7 @@
 
 const { newContext } = require('./browser');
 const { humanDelay, scrollDelay, pageLoadDelay } = require('./delays');
-const { cleanPhone, isValidUrl } = require('./utils');
+const { cleanPhone, cleanEmail, isValidUrl } = require('./utils');
 
 /**
  * Open Google Maps and search for a query.
@@ -174,6 +174,15 @@ async function extractListingDetail(page) {
   const websiteHref = await websiteEl.getAttribute('href').catch(() => null);
   const website = isValidUrl(websiteHref) ? websiteHref : null;
 
+  // Email sometimes listed directly on the Maps business page via mailto link.
+  // Extracting here avoids a full website crawl for businesses that expose it.
+  const emailHref = await page
+    .locator('a[href^="mailto:"]')
+    .first()
+    .getAttribute('href')
+    .catch(() => null);
+  const email = emailHref ? cleanEmail(emailHref.replace(/^mailto:/i, '').split('?')[0].trim()) : null;
+
   const hoursEl = page
     .locator('[data-item-id*="oh"] [aria-label*="hour" i], button[aria-expanded][aria-label*="hour" i]')
     .first();
@@ -184,6 +193,7 @@ async function extractListingDetail(page) {
     phone,
     address: address?.trim() || null,
     website,
+    email,
     reviewCount,
     hours: hours?.trim() || null,
   };
