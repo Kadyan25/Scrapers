@@ -55,4 +55,23 @@ function isValidUrl(str) {
   }
 }
 
-module.exports = { extractPhones, cleanPhone, extractEmails, cleanEmail, isValidUrl };
+/**
+ * Run an array of async task functions with a max concurrency limit.
+ * Always keeps `limit` tasks in flight until all are done.
+ *
+ * @param {Array<() => Promise<any>>} tasks
+ * @param {number} limit
+ */
+async function runConcurrent(tasks, limit) {
+  let idx = 0;
+  async function runNext() {
+    if (idx >= tasks.length) return;
+    const i = idx++;
+    await tasks[i]();
+    await runNext();
+  }
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, runNext);
+  await Promise.all(workers);
+}
+
+module.exports = { extractPhones, cleanPhone, extractEmails, cleanEmail, isValidUrl, runConcurrent };

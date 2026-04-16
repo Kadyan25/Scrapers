@@ -6,17 +6,20 @@ const { launchLocal, launchApify, newContext } = require('../../shared/browser')
 const { searchMaps, scrollResults, collectCardData, navigateToListing, extractListingDetail } = require('../../shared/gmapsNavigator');
 const { scrapeEmailFromWebsite } = require('../../shared/websiteScraper');
 const { humanDelay } = require('../../shared/delays');
+const { runConcurrent } = require('../../shared/utils');
+
+// Max parallel website scrapes. Business websites are all different domains
+// so concurrency here doesn't trigger rate limits.
+const WEBSITE_CONCURRENCY = 5;
 
 /**
  * Run the GMaps Full scraper.
  *
- * Phase 1 — search + scroll on the list page, collect basic data + place URLs.
- * Phase 2 — navigate directly to each place URL for detail extraction.
- *
- * Speed optimisation: website email scraping for listing N runs in the
- * background while we navigate to listing N+1. Both resolve via Promise.all
- * at the start of each iteration, so the slower one (website scrape) hides
- * the faster one (GMaps navigation) rather than stacking sequentially.
+ * Phase 1 — search + scroll, collect card data + place URLs.
+ * Phase 2 — sequential GMaps navigation (anti-detection), collect all detail records.
+ * Phase 3 — concurrent website scraping (up to WEBSITE_CONCURRENCY at once)
+ *           for records that have no email from Maps. Records with email already
+ *           on the Maps page skip Phase 3 entirely.
  *
  * @param {object}   input
  * @param {string}   input.query
@@ -51,16 +54,12 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
       const cardData = await collectCardData(listings, maxResults);
       await listContext.close();
 
-      // ── Phase 2: navigate to each place URL, pipeline website scraping ─────
+      // ── Phase 2: sequential GMaps navigation, build record list ───────────
       const detailContext = await newContext(browser);
       const detailPage = await detailContext.newPage();
+      const records = [];
 
       try {
-        // pendingEmail: the website scrape for the previous listing, running in background.
-        // pendingRecord: the previous listing's record, waiting for its email before push.
-        let pendingEmail = Promise.resolve(null);
-        let pendingRecord = null;
-
         for (let i = 0; i < cardData.length; i++) {
           const { basic, href } = cardData[i];
           if (!href) continue;
@@ -70,65 +69,51 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
           seen.add(dedupeKey);
 
           try {
-            // Navigate to this listing AND resolve previous email simultaneously.
-            // Website scraping (slow) runs concurrently with GMaps navigation (fast),
-            // so navigation time is hidden inside the scrape time.
-            const [prevEmail] = await Promise.all([
-              pendingEmail,
-              navigateToListing(href, detailPage),
-            ]);
-
-            // Push previous record — email is now resolved
-            if (pendingRecord) {
-              await pushResult({ ...pendingRecord, email: prevEmail, hasEmail: !!prevEmail });
-            }
-
+            await navigateToListing(href, detailPage);
             const detail = await extractListingDetail(detailPage);
 
-            pendingRecord = {
+            records.push({
               name: basic.name || detail.name,
               phone: detail.phone,
               address: detail.address,
               website: detail.website,
+              email: detail.email,       // may already be set from Maps page
               category: basic.category,
               rating: basic.rating,
               reviewCount: detail.reviewCount,
               scrapedAt: new Date().toISOString(),
-            };
+            });
 
-            // Skip website scraping if email already found on the Maps page.
-            // Only crawl the website as a fallback when Maps has no email.
-            pendingEmail = detail.email
-              ? Promise.resolve(detail.email)
-              : detail.website
-                ? scrapeEmailFromWebsite(detail.website, browser).catch(() => null)
-                : Promise.resolve(null);
-
-            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${pendingRecord.name}`);
+            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${basic.name || detail.name}`);
             await humanDelay(800, 1500);
-
           } catch (err) {
             console.warn(`[gmaps-full] Listing ${i + 1} failed: ${err.message}`);
-            // Flush any pending record before moving on
-            if (pendingRecord) {
-              try {
-                const email = await pendingEmail;
-                await pushResult({ ...pendingRecord, email, hasEmail: !!email });
-              } catch { /* ignore flush error */ }
-              pendingRecord = null;
-              pendingEmail = Promise.resolve(null);
-            }
           }
         }
-
-        // Flush the last record
-        if (pendingRecord) {
-          const lastEmail = await pendingEmail;
-          await pushResult({ ...pendingRecord, email: lastEmail, hasEmail: !!lastEmail });
-        }
-
       } finally {
         await detailContext.close();
+      }
+
+      // ── Phase 3: concurrent website scraping for missing emails ───────────
+      const needsScrape = records.filter((r) => !r.email && r.website);
+      const skipCount   = records.length - needsScrape.length;
+
+      console.log(
+        `[gmaps-full] Phase 3: ${needsScrape.length} website scrapes` +
+        (skipCount > 0 ? `, ${skipCount} already have email` : '')
+      );
+
+      await runConcurrent(
+        needsScrape.map((record) => async () => {
+          record.email = await scrapeEmailFromWebsite(record.website, browser).catch(() => null);
+        }),
+        WEBSITE_CONCURRENCY
+      );
+
+      // Push all records once emails are filled
+      for (const record of records) {
+        record.hasEmail = !!record.email;
+        await pushResult(record);
       }
 
       await humanDelay(1500, 3000);
