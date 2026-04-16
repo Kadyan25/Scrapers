@@ -6,7 +6,7 @@ const { launchLocal, launchApify, newContext } = require('../../shared/browser')
 const { scrapePhoneFromWebsite } = require('../../shared/websiteScraper');
 const { searchMaps, extractListingDetail } = require('../../shared/gmapsNavigator');
 const { extractPhones, cleanPhone, isValidUrl } = require('../../shared/utils');
-const { humanDelay, pageLoadDelay } = require('../../shared/delays');
+const { humanDelay } = require('../../shared/delays');
 
 /**
  * Step 2: Reverse-lookup the business on Google Maps by name.
@@ -37,13 +37,13 @@ async function scrapePhoneFromGoogle(businessName, browser) {
       waitUntil: 'domcontentloaded',
       timeout: 20000,
     });
-    await pageLoadDelay();
 
-    // Knowledge panel phone — most reliable
+    // Knowledge panel phone — most reliable. Short timeout: element is either
+    // present right after domcontentloaded or not at all.
     const kpPhone = await page
       .locator('[data-attrid*="phone"], [data-attrid="ss:/webfacts:phone_number"]')
       .first()
-      .textContent()
+      .textContent({ timeout: 3000 })
       .catch(() => null);
 
     if (kpPhone) {

@@ -148,30 +148,35 @@ async function extractListingDetail(page) {
     ? pageTitle.replace(/\s*[-–—]\s*Google Maps.*$/i, '').trim() || null
     : null;
 
+  // Short timeout on all locator calls — elements are present immediately after
+  // domcontentloaded on a real Maps page. Without this, Playwright waits the
+  // default 30s per missing element, stacking silently via .catch(() => null).
+  const T = { timeout: 3000 };
+
   const reviewLabel = await page
     .locator('span[aria-label$=" reviews"]')
     .first()
-    .getAttribute('aria-label')
+    .getAttribute('aria-label', T)
     .catch(() => null);
   const reviewCount = reviewLabel
     ? parseInt(reviewLabel.replace(/\D/g, ''), 10) || null
     : null;
 
   const phoneEl = page.locator('[data-item-id^="phone:"]').first();
-  const phoneAriaLabel = await phoneEl.getAttribute('aria-label').catch(() => null);
+  const phoneAriaLabel = await phoneEl.getAttribute('aria-label', T).catch(() => null);
   const rawPhone = phoneAriaLabel
     ? phoneAriaLabel.replace(/^Phone:\s*/i, '').trim()
-    : await phoneEl.textContent().catch(() => null);
+    : await phoneEl.textContent(T).catch(() => null);
   const phone = cleanPhone(rawPhone) || null;
 
   const addressEl = page.locator('[data-item-id="address"]').first();
-  const addressLabel = await addressEl.getAttribute('aria-label').catch(() => null);
+  const addressLabel = await addressEl.getAttribute('aria-label', T).catch(() => null);
   const address = addressLabel
     ? addressLabel.replace(/^Address:\s*/i, '').trim()
-    : await addressEl.textContent().catch(() => null);
+    : await addressEl.textContent(T).catch(() => null);
 
   const websiteEl = page.locator('a[data-item-id="authority"]').first();
-  const websiteHref = await websiteEl.getAttribute('href').catch(() => null);
+  const websiteHref = await websiteEl.getAttribute('href', T).catch(() => null);
   const website = isValidUrl(websiteHref) ? websiteHref : null;
 
   // Email sometimes listed directly on the Maps business page via mailto link.
@@ -179,14 +184,14 @@ async function extractListingDetail(page) {
   const emailHref = await page
     .locator('a[href^="mailto:"]')
     .first()
-    .getAttribute('href')
+    .getAttribute('href', T)
     .catch(() => null);
   const email = emailHref ? cleanEmail(emailHref.replace(/^mailto:/i, '').split('?')[0].trim()) : null;
 
   const hoursEl = page
     .locator('[data-item-id*="oh"] [aria-label*="hour" i], button[aria-expanded][aria-label*="hour" i]')
     .first();
-  const hours = await hoursEl.getAttribute('aria-label').catch(() => null);
+  const hours = await hoursEl.getAttribute('aria-label', T).catch(() => null);
 
   return {
     name: name?.trim() || null,
