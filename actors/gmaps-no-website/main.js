@@ -55,12 +55,12 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
           const detail = await extractListingDetail(page);
 
           const record = {
-            name: detail.name || basic.name,
+            name: basic.name || detail.name,
             phone: detail.phone,
             address: detail.address,
             category: basic.category,
             rating: basic.rating,
-            reviewCount: basic.reviewCount,
+            reviewCount: detail.reviewCount,
             scrapedAt: new Date().toISOString(),
           };
 

@@ -55,14 +55,14 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
           }
 
           const record = {
-            name: detail.name || basic.name,
+            name: basic.name || detail.name,
             phone: detail.phone,
             address: detail.address,
             website: detail.website,
             email,
             category: basic.category,
             rating: basic.rating,
-            reviewCount: basic.reviewCount,
+            reviewCount: detail.reviewCount,
             hasEmail: !!email,
             scrapedAt: new Date().toISOString(),
           };
