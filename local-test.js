@@ -11,19 +11,21 @@ const TEST_SCRAPER = process.env.TEST_SCRAPER || 'gmaps-full';
 const TEST_INPUTS = {
   'gmaps-full': {
     query: 'auto body shop Brooklyn NY',
-    maxResults: 20,
+    maxResults: 15,
   },
 
   'gmaps-no-website': {
     query: 'plumber Queens NY',
-    maxResults: 20,
+    maxResults: 15,
   },
 
   'phone-enricher': {
     records: [
-      { businessName: 'Joe\'s Auto Repair Brooklyn', website: 'https://joesauto.com' },
-      { businessName: 'Manhattan Dental Studio', email: 'info@manhattandental.com' },
-      { businessName: 'Brooklyn Radiator Works' },
+      { businessName: 'Salerno Auto Body Shop Brooklyn' },
+      { businessName: 'TNS Auto Collision Brooklyn', website: 'https://www.tnsautocollision.com' },
+      { businessName: 'Brooklyn Motors', website: 'http://www.brooklynmotorsny.com' },
+      { businessName: 'Aces Auto Bodyshop Brooklyn' },
+      { businessName: 'Alex Auto Body Brooklyn', website: 'https://alexautobody.com' },
     ],
   },
 };

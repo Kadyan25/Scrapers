@@ -69,8 +69,10 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
             if (seen.has(dedupeKey)) continue;
             seen.add(dedupeKey);
 
+            const t = Date.now();
             await navigateToListing(href, detailPage);
             const detail = await extractListingDetail(detailPage);
+            const elapsed = ((Date.now() - t) / 1000).toFixed(1);
 
             const record = {
               name: basic.name || detail.name,
@@ -83,7 +85,7 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
             };
 
             await pushResult(record);
-            console.log(`[gmaps-no-website] ${i + 1}/${noWebsiteCards.length} — ${record.name}`);
+            console.log(`[gmaps-no-website] ${i + 1}/${noWebsiteCards.length} — ${record.name} (${elapsed}s)`);
 
             await humanDelay(800, 1500);
           } catch (err) {

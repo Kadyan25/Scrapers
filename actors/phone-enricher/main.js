@@ -82,22 +82,24 @@ async function run({ records, pushResult, proxyUrl }) {
 
       let phone = null;
       let enrichmentStatus = 'not_found';
+      const t = Date.now();
 
-      // Step 1 — website scrape
-      if (!phone && isValidUrl(website)) {
-        console.log(`[phone-enricher] Step 1 — website: ${website}`);
-        phone = await scrapePhoneFromWebsite(website, browser).catch(() => null);
-        if (phone) enrichmentStatus = 'found_via_website';
-      }
-
-      // Step 2 — GMaps reverse lookup
+      // Step 1 — GMaps listing (fast, ~3s, almost always has phone for local businesses)
+      // If found here, skip website and Google entirely.
       if (!phone && businessName) {
-        console.log(`[phone-enricher] Step 2 — Maps: ${businessName}`);
+        console.log(`[phone-enricher] Step 1 — Maps: ${businessName}`);
         phone = await scrapePhoneFromMaps(businessName, browser).catch(() => null);
         if (phone) enrichmentStatus = 'found_via_maps';
       }
 
-      // Step 3 — Google Search
+      // Step 2 — website scrape (fallback when Maps has no phone)
+      if (!phone && isValidUrl(website)) {
+        console.log(`[phone-enricher] Step 2 — website: ${website}`);
+        phone = await scrapePhoneFromWebsite(website, browser).catch(() => null);
+        if (phone) enrichmentStatus = 'found_via_website';
+      }
+
+      // Step 3 — Google Search (last resort)
       if (!phone && businessName) {
         console.log(`[phone-enricher] Step 3 — Google: ${businessName}`);
         phone = await scrapePhoneFromGoogle(businessName, browser).catch(() => null);
@@ -111,8 +113,9 @@ async function run({ records, pushResult, proxyUrl }) {
         enrichedAt: new Date().toISOString(),
       };
 
+      const elapsed = ((Date.now() - t) / 1000).toFixed(1);
       await pushResult(result);
-      console.log(`[phone-enricher] ${businessName || website} → ${phone || 'not found'} (${enrichmentStatus})`);
+      console.log(`[phone-enricher] ${businessName || website} → ${phone || 'not found'} (${enrichmentStatus}, ${elapsed}s)`);
 
       await humanDelay(1000, 2000);
     }

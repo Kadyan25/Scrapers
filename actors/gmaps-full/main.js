@@ -69,8 +69,10 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
           seen.add(dedupeKey);
 
           try {
+            const t = Date.now();
             await navigateToListing(href, detailPage);
             const detail = await extractListingDetail(detailPage);
+            const navMs = ((Date.now() - t) / 1000).toFixed(1);
 
             records.push({
               name: basic.name || detail.name,
@@ -84,7 +86,8 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
               scrapedAt: new Date().toISOString(),
             });
 
-            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${basic.name || detail.name}`);
+            const emailSource = detail.email ? ' [email:maps]' : detail.website ? ' [email:pending]' : '';
+            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${basic.name || detail.name} (nav ${navMs}s${emailSource})`);
             await humanDelay(800, 1500);
           } catch (err) {
             console.warn(`[gmaps-full] Listing ${i + 1} failed: ${err.message}`);
@@ -105,7 +108,10 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
 
       await runConcurrent(
         needsScrape.map((record) => async () => {
+          const t = Date.now();
           record.email = await scrapeEmailFromWebsite(record.website, browser).catch(() => null);
+          const elapsed = ((Date.now() - t) / 1000).toFixed(1);
+          console.log(`[gmaps-full] website scrape — ${record.name}: ${record.email || 'no email'} (${elapsed}s)`);
         }),
         WEBSITE_CONCURRENCY
       );
