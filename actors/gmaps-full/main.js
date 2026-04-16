@@ -13,8 +13,10 @@ const { humanDelay } = require('../../shared/delays');
  * Phase 1 — search + scroll on the list page, collect basic data + place URLs.
  * Phase 2 — navigate directly to each place URL for detail extraction.
  *
- * Direct navigation avoids stale locator issues that occur when clicking
- * cards after the search page has navigated away.
+ * Speed optimisation: website email scraping for listing N runs in the
+ * background while we navigate to listing N+1. Both resolve via Promise.all
+ * at the start of each iteration, so the slower one (website scrape) hides
+ * the faster one (GMaps navigation) rather than stacking sequentially.
  *
  * @param {object}   input
  * @param {string}   input.query
@@ -25,7 +27,7 @@ const { humanDelay } = require('../../shared/delays');
  */
 async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) {
   const queries = geoTiles && geoTiles.length > 0 ? geoTiles : [query];
-  const seen = new Set(); // within-run dedup by name
+  const seen = new Set();
 
   const browser = proxyUrl ? await launchApify(proxyUrl) : await launchLocal();
 
@@ -47,51 +49,82 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
 
       console.log(`[gmaps-full] Found ${listings.length} listings, collecting up to ${maxResults}`);
       const cardData = await collectCardData(listings, maxResults);
-      await listContext.close(); // list page no longer needed
+      await listContext.close();
 
-      // ── Phase 2: navigate to each place URL for detail ─────────────────────
+      // ── Phase 2: navigate to each place URL, pipeline website scraping ─────
       const detailContext = await newContext(browser);
       const detailPage = await detailContext.newPage();
 
       try {
+        // pendingEmail: the website scrape for the previous listing, running in background.
+        // pendingRecord: the previous listing's record, waiting for its email before push.
+        let pendingEmail = Promise.resolve(null);
+        let pendingRecord = null;
+
         for (let i = 0; i < cardData.length; i++) {
           const { basic, href } = cardData[i];
           if (!href) continue;
 
+          const dedupeKey = `${basic.name}|${basic.category}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+
           try {
-            const dedupeKey = `${basic.name}|${basic.category}`;
-            if (seen.has(dedupeKey)) continue;
-            seen.add(dedupeKey);
+            // Navigate to this listing AND resolve previous email simultaneously.
+            // Website scraping (slow) runs concurrently with GMaps navigation (fast),
+            // so navigation time is hidden inside the scrape time.
+            const [prevEmail] = await Promise.all([
+              pendingEmail,
+              navigateToListing(href, detailPage),
+            ]);
 
-            await navigateToListing(href, detailPage);
-            const detail = await extractListingDetail(detailPage);
-
-            let email = null;
-            if (detail.website) {
-              email = await scrapeEmailFromWebsite(detail.website, browser);
+            // Push previous record — email is now resolved
+            if (pendingRecord) {
+              await pushResult({ ...pendingRecord, email: prevEmail, hasEmail: !!prevEmail });
             }
 
-            const record = {
+            const detail = await extractListingDetail(detailPage);
+
+            pendingRecord = {
               name: basic.name || detail.name,
               phone: detail.phone,
               address: detail.address,
               website: detail.website,
-              email,
               category: basic.category,
               rating: basic.rating,
               reviewCount: detail.reviewCount,
-              hasEmail: !!email,
               scrapedAt: new Date().toISOString(),
             };
 
-            await pushResult(record);
-            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${record.name}`);
+            // Fire website scraping in background — runs while we humanDelay
+            // + navigate to the next listing
+            pendingEmail = detail.website
+              ? scrapeEmailFromWebsite(detail.website, browser).catch(() => null)
+              : Promise.resolve(null);
 
+            console.log(`[gmaps-full] ${i + 1}/${cardData.length} — ${pendingRecord.name}`);
             await humanDelay(800, 1500);
+
           } catch (err) {
             console.warn(`[gmaps-full] Listing ${i + 1} failed: ${err.message}`);
+            // Flush any pending record before moving on
+            if (pendingRecord) {
+              try {
+                const email = await pendingEmail;
+                await pushResult({ ...pendingRecord, email, hasEmail: !!email });
+              } catch { /* ignore flush error */ }
+              pendingRecord = null;
+              pendingEmail = Promise.resolve(null);
+            }
           }
         }
+
+        // Flush the last record
+        if (pendingRecord) {
+          const lastEmail = await pendingEmail;
+          await pushResult({ ...pendingRecord, email: lastEmail, hasEmail: !!lastEmail });
+        }
+
       } finally {
         await detailContext.close();
       }

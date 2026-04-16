@@ -114,7 +114,7 @@ async function scrapePhoneFromWebsite(url, browser) {
     const base = url.replace(/\/$/, '');
     for (const path of CONTACT_PATHS) {
       try {
-        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 12000 });
+        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 8000 });
 
         const telLinks = await page.$$eval('a[href^="tel:"]', (links) =>
           links.map((a) => a.href.replace('tel:', '').trim())
@@ -163,7 +163,7 @@ async function scrapeEmailFromWebsite(url, browser) {
     const base = url.replace(/\/$/, '');
     for (const path of CONTACT_PATHS) {
       try {
-        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 12000 });
+        await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 8000 });
 
         const mailtoLinks = await page.$$eval('a[href^="mailto:"]', (links) =>
           links.map((a) => a.href.replace('mailto:', '').split('?')[0].trim())
