@@ -86,7 +86,7 @@ function parseApiResponse(text) {
 
 /**
  * Search Google Maps via HTTP and return listing objects (no browser required).
- * Phone is not available — only name, address, website, rating, category.
+ * Paginates using start=N parameter — Google returns 20 results per page.
  *
  * @param {string} query
  * @param {number} limit
@@ -96,31 +96,45 @@ async function searchMapsHttp(query, limit) {
   const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
   console.log(`[gmaps-http] HTTP search: ${searchUrl}`);
 
+  // Step 1: get the internal API URL with pb= parameter from initial page
   const html = await fetchHtml(searchUrl);
   if (!html) return [];
 
-  const apiUrl = extractSearchApiUrl(html);
-  if (!apiUrl) {
+  const baseApiUrl = extractSearchApiUrl(html);
+  if (!baseApiUrl) {
     console.warn('[gmaps-http] No API URL found — page may be blocked. First 400 chars:');
     console.warn(html.slice(0, 400));
     return [];
   }
 
-  const apiResponse = await fetchHtml(apiUrl);
-  if (!apiResponse) return [];
+  // Step 2: paginate — 20 results per page, stop when we have enough or run dry
+  const PAGE_SIZE = 20;
+  const allListings = [];
 
-  let listings;
-  try {
-    listings = parseApiResponse(apiResponse);
-  } catch (err) {
-    console.warn('[gmaps-http] Parse failed:', err.message, '| First 300 chars:', apiResponse.slice(0, 300));
-    return [];
+  for (let start = 0; allListings.length < limit; start += PAGE_SIZE) {
+    const apiUrl = start === 0 ? baseApiUrl : `${baseApiUrl}&start=${start}`;
+    const apiResponse = await fetchHtml(apiUrl);
+    if (!apiResponse) break;
+
+    let page;
+    try {
+      page = parseApiResponse(apiResponse);
+    } catch (err) {
+      console.warn(`[gmaps-http] Parse failed at start=${start}:`, err.message);
+      break;
+    }
+
+    if (page.length === 0) break; // no more results
+
+    allListings.push(...page);
+    console.log(`[gmaps-http] Page start=${start}: ${page.length} listings (${allListings.length} total)`);
+
+    if (page.length < PAGE_SIZE) break; // last page
   }
 
-  console.log(`[gmaps-http] ${listings.length} listings parsed`);
-  if (listings[0]) console.log(`[gmaps-http] Sample: ${listings[0].name} — ${listings[0].address}`);
+  if (allListings[0]) console.log(`[gmaps-http] Sample: ${allListings[0].name} — ${allListings[0].address}`);
 
-  return listings.slice(0, limit);
+  return allListings.slice(0, limit);
 }
 
 module.exports = { searchMapsHttp };
