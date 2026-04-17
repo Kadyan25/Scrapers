@@ -29,6 +29,13 @@
           }
         }
       }
+    },
+    "includeSocial": {
+      "title": "Scrape Instagram / Facebook",
+      "type": "boolean",
+      "description": "If a business website is an Instagram or Facebook page, attempt to scrape contact info from it. Uses browser + proxy — costs more. Default off.",
+      "default": false,
+      "editor": "checkbox"
     }
   },
   "required": ["records"]

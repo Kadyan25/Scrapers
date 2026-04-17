@@ -24,7 +24,15 @@
       "minimum": 1,
       "maximum": 120,
       "editor": "number"
+    },
+    "includeSocial": {
+      "title": "Scrape Instagram / Facebook",
+      "type": "boolean",
+      "description": "If a business lists Instagram or Facebook as their website, attempt to scrape contact info from it. Uses browser + proxy — costs more. Default off.",
+      "default": false,
+      "editor": "checkbox"
     }
   },
-  "required": ["query"]
+  "required": ["query"],
+  "additionalProperties": false
 }

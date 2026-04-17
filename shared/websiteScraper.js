@@ -119,15 +119,15 @@ async function scrapeFacebook(url, browser) {
 
 /**
  * Find a phone number from a business website using plain HTTP fetch.
- * browser is only used if the URL is an Instagram or Facebook page.
+ * Pass includeSocial: true to also attempt Instagram/Facebook scraping (uses browser + proxy).
  * @returns {string|null}
  */
-async function scrapePhoneFromWebsite(url, browser) {
+async function scrapePhoneFromWebsite(url, browser, { includeSocial = false } = {}) {
   if (!url) return null;
   if (shouldSkip(url)) return null;
   const domain = getDomain(url);
-  if (INSTAGRAM_DOMAINS.includes(domain)) return (await scrapeInstagram(url, browser)).phone;
-  if (FACEBOOK_DOMAINS.includes(domain))  return (await scrapeFacebook(url, browser)).phone;
+  if (INSTAGRAM_DOMAINS.includes(domain)) return includeSocial ? (await scrapeInstagram(url, browser)).phone : null;
+  if (FACEBOOK_DOMAINS.includes(domain))  return includeSocial ? (await scrapeFacebook(url, browser)).phone  : null;
 
   const base = url.replace(/\/$/, '');
   for (const path of CONTACT_PATHS) {
@@ -141,15 +141,15 @@ async function scrapePhoneFromWebsite(url, browser) {
 
 /**
  * Find an email address from a business website using plain HTTP fetch.
- * browser is only used if the URL is an Instagram or Facebook page.
+ * Pass includeSocial: true to also attempt Instagram/Facebook scraping (uses browser + proxy).
  * @returns {string|null}
  */
-async function scrapeEmailFromWebsite(url, browser) {
+async function scrapeEmailFromWebsite(url, browser, { includeSocial = false } = {}) {
   if (!url) return null;
   if (shouldSkip(url)) return null;
   const domain = getDomain(url);
-  if (INSTAGRAM_DOMAINS.includes(domain)) return (await scrapeInstagram(url, browser)).email;
-  if (FACEBOOK_DOMAINS.includes(domain))  return (await scrapeFacebook(url, browser)).email;
+  if (INSTAGRAM_DOMAINS.includes(domain)) return includeSocial ? (await scrapeInstagram(url, browser)).email : null;
+  if (FACEBOOK_DOMAINS.includes(domain))  return includeSocial ? (await scrapeFacebook(url, browser)).email  : null;
 
   const base = url.replace(/\/$/, '');
   for (const path of CONTACT_PATHS) {

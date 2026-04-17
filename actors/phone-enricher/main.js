@@ -32,7 +32,7 @@ async function scrapePhoneFromMaps(businessName, browser) {
  * @param {Function} pushResult
  * @param {string}   [proxyUrl]
  */
-async function run({ records, pushResult, proxyUrl }) {
+async function run({ records, includeSocial = false, pushResult, proxyUrl }) {
   const browser = proxyUrl ? await launchApify(proxyUrl) : await launchLocal();
 
   try {
@@ -52,7 +52,7 @@ async function run({ records, pushResult, proxyUrl }) {
       // If website is provided, always try this first before opening any browser.
       if (!phone && isValidUrl(website)) {
         console.log(`[phone-enricher] Step 1 — website: ${website}`);
-        phone = await scrapePhoneFromWebsite(website, browser).catch(() => null);
+        phone = await scrapePhoneFromWebsite(website, browser, { includeSocial }).catch(() => null);
         if (phone) enrichmentStatus = 'found_via_website';
       }
 

@@ -22,7 +22,7 @@ const { humanDelay } = require('../../shared/delays');
  * @param {Function} pushResult
  * @param {string}   [proxyUrl]
  */
-async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) {
+async function run({ query, geoTiles, maxResults = 120, includeSocial = false, pushResult, proxyUrl }) {
   const queries = geoTiles && geoTiles.length > 0 ? geoTiles : [query];
   const seen = new Set();
 
@@ -100,7 +100,9 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
       }
 
       // ── Phase 3: Google Search for email on listings that don't have one ───
-      const needsEmail = records.filter((r) => !r.email && r.name);
+      // Only search for email if we have a phone — confirms it's an active business worth contacting.
+      // Listings with no phone are likely inactive or data-sparse; skip the proxy cost.
+      const needsEmail = records.filter((r) => !r.email && r.name && r.phone);
       console.log(`[gmaps-no-website] Phase 3: email search for ${needsEmail.length}/${records.length} listings`);
 
       for (const record of needsEmail) {

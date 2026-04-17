@@ -28,7 +28,7 @@ const WEBSITE_CONCURRENCY = 5;
  * @param {Function} pushResult
  * @param {string}   [proxyUrl]
  */
-async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) {
+async function run({ query, geoTiles, maxResults = 120, includeSocial = false, pushResult, proxyUrl }) {
   const queries = geoTiles && geoTiles.length > 0 ? geoTiles : [query];
   const seen = new Set();
 
@@ -109,7 +109,7 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
       await runConcurrent(
         needsScrape.map((record) => async () => {
           const t = Date.now();
-          record.email = await scrapeEmailFromWebsite(record.website, browser).catch(() => null);
+          record.email = await scrapeEmailFromWebsite(record.website, browser, { includeSocial }).catch(() => null);
           const elapsed = ((Date.now() - t) / 1000).toFixed(1);
           console.log(`[gmaps-full] website scrape — ${record.name}: ${record.email || 'no email'} (${elapsed}s)`);
         }),
