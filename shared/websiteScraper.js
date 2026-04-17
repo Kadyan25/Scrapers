@@ -161,4 +161,75 @@ async function scrapeEmailFromWebsite(url, browser) {
   return null;
 }
 
-module.exports = { scrapePhoneFromWebsite, scrapeEmailFromWebsite };
+// ─── Google Search fallbacks — used when website scrape finds nothing ─────────
+
+/**
+ * Search Google for "[businessName] phone number" and extract the phone.
+ * Uses the browser (needs proxy) — only call this as a last resort.
+ * @returns {string|null}
+ */
+async function scrapePhoneFromGoogle(businessName, browser) {
+  const context = await newContext(browser);
+  const page = await context.newPage();
+  try {
+    const query = encodeURIComponent(`${businessName} phone number`);
+    await page.goto(`https://www.google.com/search?q=${query}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 20000,
+    });
+    const kpPhone = await page
+      .locator('[data-attrid*="phone"], [data-attrid="ss:/webfacts:phone_number"]')
+      .first()
+      .textContent({ timeout: 3000 })
+      .catch(() => null);
+    if (kpPhone) {
+      const cleaned = cleanPhone(kpPhone);
+      if (cleaned) return cleaned;
+    }
+    const bodyText = await page.evaluate(() => document.body.innerText);
+    return extractPhones(bodyText)[0] || null;
+  } catch {
+    return null;
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * Search Google for "[businessName] email contact" and extract an email.
+ * Uses the browser (needs proxy) — only call this as a last resort.
+ * @returns {string|null}
+ */
+async function scrapeEmailFromGoogle(businessName, browser) {
+  const context = await newContext(browser);
+  const page = await context.newPage();
+  try {
+    const query = encodeURIComponent(`"${businessName}" email contact`);
+    await page.goto(`https://www.google.com/search?q=${query}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 20000,
+    });
+    const mailtoHref = await page
+      .locator('a[href^="mailto:"]')
+      .first()
+      .getAttribute('href', { timeout: 3000 })
+      .catch(() => null);
+    if (mailtoHref) {
+      const email = cleanEmail(mailtoHref.replace(/^mailto:/i, '').split('?')[0].trim());
+      if (email) return email;
+    }
+    const bodyText = await page.evaluate(() => document.body.innerText);
+    return extractEmails(bodyText)[0] || null;
+  } catch {
+    return null;
+  } finally {
+    await context.close();
+  }
+}
+
+module.exports = {
+  scrapePhoneFromWebsite,
+  scrapeEmailFromWebsite,
+  scrapePhoneFromGoogle,
+  scrapeEmailFromGoogle,
+};

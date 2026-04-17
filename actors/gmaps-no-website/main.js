@@ -4,6 +4,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 
 const { launchLocal, launchApify, newContext } = require('../../shared/browser');
 const { searchMaps, scrollResults, collectCardData, navigateToListing, extractListingDetail } = require('../../shared/gmapsNavigator');
+const { scrapeEmailFromGoogle } = require('../../shared/websiteScraper');
 const { humanDelay } = require('../../shared/delays');
 
 /**
@@ -11,7 +12,8 @@ const { humanDelay } = require('../../shared/delays');
  * Only returns listings that have NO website — high-intent leads.
  *
  * Phase 1 — search + scroll, collect basic data + place URLs.
- * Phase 2 — navigate directly to each no-website listing for detail extraction.
+ * Phase 2 — navigate to each no-website listing, extract detail + any email on Maps page.
+ * Phase 3 — for listings still missing email, Google Search as fallback.
  *
  * @param {object}   input
  * @param {string}   input.query
@@ -46,7 +48,6 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
       const allCards = await collectCardData(listings, maxResults);
       await listContext.close();
 
-      // Filter to no-website listings only — do this before opening detail pages
       const noWebsiteCards = allCards.filter(({ basic }) => !basic.hasWebsite);
       console.log(`[gmaps-no-website] ${noWebsiteCards.length} no-website leads to process`);
 
@@ -55,26 +56,30 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
         continue;
       }
 
-      // ── Phase 2: navigate to each no-website listing for detail ────────────
+      // ── Phase 2: navigate to each listing, extract detail ──────────────────
       const detailContext = await newContext(browser);
       const detailPage = await detailContext.newPage();
+      const records = [];
 
       try {
         for (let i = 0; i < noWebsiteCards.length; i++) {
           const { basic, href } = noWebsiteCards[i];
           if (!href) continue;
 
-          try {
-            const dedupeKey = `${basic.name}|${basic.category}`;
-            if (seen.has(dedupeKey)) continue;
-            seen.add(dedupeKey);
+          const dedupeKey = `${basic.name}|${basic.category}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
 
+          try {
             const t = Date.now();
             await navigateToListing(href, detailPage);
             const detail = await extractListingDetail(detailPage);
             const elapsed = ((Date.now() - t) / 1000).toFixed(1);
 
-            const record = {
+            const emailSource = detail.email ? ' [email:maps]' : ' [email:pending]';
+            console.log(`[gmaps-no-website] ${i + 1}/${noWebsiteCards.length} — ${basic.name || detail.name} (${elapsed}s${emailSource})`);
+
+            records.push({
               name: basic.name || detail.name,
               phone: detail.phone,
               address: detail.address,
@@ -83,10 +88,7 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
               rating: basic.rating,
               reviewCount: detail.reviewCount,
               scrapedAt: new Date().toISOString(),
-            };
-
-            await pushResult(record);
-            console.log(`[gmaps-no-website] ${i + 1}/${noWebsiteCards.length} — ${record.name} (${elapsed}s)`);
+            });
 
             await humanDelay(800, 1500);
           } catch (err) {
@@ -95,6 +97,20 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
         }
       } finally {
         await detailContext.close();
+      }
+
+      // ── Phase 3: Google Search for email on listings that don't have one ───
+      const needsEmail = records.filter((r) => !r.email && r.name);
+      console.log(`[gmaps-no-website] Phase 3: email search for ${needsEmail.length}/${records.length} listings`);
+
+      for (const record of needsEmail) {
+        record.email = await scrapeEmailFromGoogle(record.name, browser).catch(() => null);
+        console.log(`[gmaps-no-website] email — ${record.name}: ${record.email || 'not found'}`);
+        await humanDelay(1000, 2000);
+      }
+
+      for (const record of records) {
+        await pushResult(record);
       }
 
       await humanDelay(1500, 3000);

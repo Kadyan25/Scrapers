@@ -2,10 +2,10 @@
 
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const { launchLocal, launchApify, newContext } = require('../../shared/browser');
-const { scrapePhoneFromWebsite } = require('../../shared/websiteScraper');
+const { launchLocal, launchApify } = require('../../shared/browser');
+const { scrapePhoneFromWebsite, scrapePhoneFromGoogle } = require('../../shared/websiteScraper');
 const { searchMaps, extractListingDetail } = require('../../shared/gmapsNavigator');
-const { extractPhones, cleanPhone, isValidUrl } = require('../../shared/utils');
+const { isValidUrl } = require('../../shared/utils');
 const { humanDelay } = require('../../shared/delays');
 
 /**
@@ -19,42 +19,6 @@ async function scrapePhoneFromMaps(businessName, browser) {
     await humanDelay(1500, 2500);
     const detail = await extractListingDetail(page);
     return detail.phone || null;
-  } finally {
-    await context.close();
-  }
-}
-
-/**
- * Step 3: Google Search for "[businessName] phone number".
- * Extracts phone from the knowledge panel or page text.
- */
-async function scrapePhoneFromGoogle(businessName, browser) {
-  const context = await newContext(browser);
-  const page = await context.newPage();
-  try {
-    const query = encodeURIComponent(`${businessName} phone number`);
-    await page.goto(`https://www.google.com/search?q=${query}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 20000,
-    });
-
-    // Knowledge panel phone — most reliable. Short timeout: element is either
-    // present right after domcontentloaded or not at all.
-    const kpPhone = await page
-      .locator('[data-attrid*="phone"], [data-attrid="ss:/webfacts:phone_number"]')
-      .first()
-      .textContent({ timeout: 3000 })
-      .catch(() => null);
-
-    if (kpPhone) {
-      const cleaned = cleanPhone(kpPhone);
-      if (cleaned) return cleaned;
-    }
-
-    // Fallback: scan visible text for phone patterns
-    const bodyText = await page.evaluate(() => document.body.innerText);
-    const phones = extractPhones(bodyText);
-    return phones[0] || null;
   } finally {
     await context.close();
   }
@@ -84,19 +48,19 @@ async function run({ records, pushResult, proxyUrl }) {
       let enrichmentStatus = 'not_found';
       const t = Date.now();
 
-      // Step 1 — GMaps listing (fast, ~3s, almost always has phone for local businesses)
-      // If found here, skip website and Google entirely.
-      if (!phone && businessName) {
-        console.log(`[phone-enricher] Step 1 — Maps: ${businessName}`);
-        phone = await scrapePhoneFromMaps(businessName, browser).catch(() => null);
-        if (phone) enrichmentStatus = 'found_via_maps';
-      }
-
-      // Step 2 — website scrape (fallback when Maps has no phone)
+      // Step 1 — website HTTP fetch (free: no browser, no proxy)
+      // If website is provided, always try this first before opening any browser.
       if (!phone && isValidUrl(website)) {
-        console.log(`[phone-enricher] Step 2 — website: ${website}`);
+        console.log(`[phone-enricher] Step 1 — website: ${website}`);
         phone = await scrapePhoneFromWebsite(website, browser).catch(() => null);
         if (phone) enrichmentStatus = 'found_via_website';
+      }
+
+      // Step 2 — GMaps lookup (costs proxy — only runs if website didn't have phone)
+      if (!phone && businessName) {
+        console.log(`[phone-enricher] Step 2 — Maps: ${businessName}`);
+        phone = await scrapePhoneFromMaps(businessName, browser).catch(() => null);
+        if (phone) enrichmentStatus = 'found_via_maps';
       }
 
       // Step 3 — Google Search (last resort)
