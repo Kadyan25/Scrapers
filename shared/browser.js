@@ -60,19 +60,36 @@ async function newContext(browser) {
   });
 }
 
+// Third-party domains that add bandwidth without affecting scraped data.
+const BLOCKED_DOMAINS = [
+  'googleadservices.com',
+  'googlesyndication.com',
+  'doubleclick.net',
+  'google-analytics.com',
+  'googletagmanager.com',
+  'googletagservices.com',
+  'adservice.google.com',
+  'stats.g.doubleclick.net',
+  'www.google-analytics.com',
+  'analytics.google.com',
+];
+
 /**
- * Block images, fonts, and media on a page — cuts proxy bandwidth ~70%.
- * Map tiles alone are 6-8MB per Maps page; we never need them for data extraction.
- * Call this on every new page before navigating.
+ * Block images, fonts, media, and third-party analytics/ad scripts.
+ * Map tiles alone are 6-8MB per Maps page; analytics add more with zero benefit.
+ * Call this once on every new page before navigating.
  */
 async function blockHeavyResources(page) {
   await page.route('**/*', (route) => {
     const type = route.request().resourceType();
     if (type === 'image' || type === 'media' || type === 'font') {
-      route.abort();
-    } else {
-      route.continue();
+      return route.abort();
     }
+    const url = route.request().url();
+    if (BLOCKED_DOMAINS.some((d) => url.includes(d))) {
+      return route.abort();
+    }
+    route.continue();
   });
 }
 
