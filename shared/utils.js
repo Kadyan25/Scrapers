@@ -34,12 +34,27 @@ function extractEmails(text) {
   return [...new Set(matches.map(cleanEmail))].filter(Boolean);
 }
 
+// Placeholder emails that appear in website templates and contact form examples.
+const FAKE_EMAIL_PATTERNS = [
+  /^user@/,
+  /^john@/,
+  /^jane@/,
+  /^info@example\./,
+  /^email@example\./,
+  /@example\.(com|org|net)$/,
+  /@domain\.(com|org|net)$/,
+  /^(noreply|no-reply|donotreply|do-not-reply)@/,
+  /^(test|demo|sample|placeholder|yourname|youremail|your\.email)@/,
+];
+
 /**
- * Normalize an email: lowercase and trim.
+ * Normalize an email: lowercase and trim. Returns null for obvious placeholders.
  */
 function cleanEmail(email) {
   if (!email) return null;
-  return email.toLowerCase().trim();
+  const e = email.toLowerCase().trim();
+  if (FAKE_EMAIL_PATTERNS.some((re) => re.test(e))) return null;
+  return e;
 }
 
 /**
