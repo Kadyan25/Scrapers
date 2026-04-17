@@ -163,6 +163,37 @@ async function scrapeEmailFromWebsite(url, browser, { includeSocial = false } = 
   return null;
 }
 
+/**
+ * Scrape both phone AND email from a business website in a single pass.
+ * Fetches each contact page once and extracts both fields — twice as efficient
+ * as calling scrapePhoneFromWebsite + scrapeEmailFromWebsite separately.
+ *
+ * @returns {{ phone: string|null, email: string|null }}
+ */
+async function scrapeContactFromWebsite(url, browser, { includeSocial = false } = {}) {
+  if (!url) return { phone: null, email: null };
+  if (shouldSkip(url)) return { phone: null, email: null };
+
+  const domain = getDomain(url);
+  if (INSTAGRAM_DOMAINS.includes(domain)) return includeSocial ? scrapeInstagram(url, browser) : { phone: null, email: null };
+  if (FACEBOOK_DOMAINS.includes(domain))  return includeSocial ? scrapeFacebook(url, browser)  : { phone: null, email: null };
+
+  const base = url.replace(/\/$/, '');
+  let phone = null;
+  let email = null;
+
+  for (const path of CONTACT_PATHS) {
+    const raw = await fetchHtml(base + path);
+    if (!raw) continue;
+    const decoded = decodeEntities(raw);
+    if (!phone) phone = phoneFromHtml(decoded);
+    if (!email) email = emailFromHtml(decoded);
+    if (phone && email) break; // found both — stop early
+  }
+
+  return { phone, email };
+}
+
 // ─── Google Search fallbacks — used when website scrape finds nothing ─────────
 
 /**
@@ -234,6 +265,7 @@ async function scrapeEmailFromGoogle(businessName, browser) {
 module.exports = {
   scrapePhoneFromWebsite,
   scrapeEmailFromWebsite,
+  scrapeContactFromWebsite,
   scrapePhoneFromGoogle,
   scrapeEmailFromGoogle,
 };

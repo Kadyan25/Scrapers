@@ -3,7 +3,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
 const { launchLocal, launchApify } = require('../../shared/browser');
-const { scrapeEmailFromWebsite } = require('../../shared/websiteScraper');
+const { scrapeContactFromWebsite } = require('../../shared/websiteScraper');
 const { humanDelay } = require('../../shared/delays');
 const { runConcurrent } = require('../../shared/utils');
 const { searchMapsHttp } = require('./httpSearch');
@@ -83,9 +83,12 @@ async function run({ query, geoTiles, maxResults = 20, includeSocial = false, pu
         needsScrape.map((record) => async () => {
           const t = Date.now();
           const b = await getBrowser();
-          record.email = await scrapeEmailFromWebsite(record.website, b, { includeSocial }).catch(() => null);
+          const { phone, email } = await scrapeContactFromWebsite(record.website, b, { includeSocial }).catch(() => ({ phone: null, email: null }));
+          record.phone = phone;
+          record.email = email;
           const elapsed = ((Date.now() - t) / 1000).toFixed(1);
-          console.log(`[gmaps-http] website — ${record.name}: ${record.email || 'no email'} (${elapsed}s)`);
+          const found = [phone && 'phone', email && 'email'].filter(Boolean).join('+') || 'nothing';
+          console.log(`[gmaps-http] website — ${record.name}: ${found} (${elapsed}s)`);
         }),
         WEBSITE_CONCURRENCY
       );
