@@ -11,12 +11,12 @@ const TEST_SCRAPER = process.env.TEST_SCRAPER || 'gmaps-full';
 const TEST_INPUTS = {
   'gmaps-full': {
     query: 'auto body shop Brooklyn NY',
-    maxResults: 15,
+    maxResults: 3,
   },
 
   'gmaps-no-website': {
-    query: 'plumber Queens NY',
-    maxResults: 15,
+    query: 'nail salon Bronx NY',
+    maxResults: 10,
   },
 
   'phone-enricher': {

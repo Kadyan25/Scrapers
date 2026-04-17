@@ -5,6 +5,6 @@
   "description": "Enrich businesses with phone numbers via cascade: website scrape → Google Maps lookup → Google Search.",
   "version": "0.1",
   "buildTag": "latest",
-  "environmentVariables": [],
+  "environmentVariables": {},
   "dockerfile": "./Dockerfile"
 }

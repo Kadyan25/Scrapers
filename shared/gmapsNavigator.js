@@ -15,7 +15,7 @@ async function searchMaps(query, browser) {
   const encodedQuery = encodeURIComponent(query);
   await page.goto(`https://www.google.com/maps/search/${encodedQuery}`, {
     waitUntil: 'domcontentloaded',
-    timeout: 30000,
+    timeout: 60000,
   });
   await pageLoadDelay();
 
@@ -33,11 +33,15 @@ async function searchMaps(query, browser) {
 async function scrollResults(page) {
   const feed = page.locator('[role="feed"]');
 
+  // Fail fast if the feed never appeared (consent page, CAPTCHA, blocked IP).
+  // Without an explicit timeout, locator.evaluate() waits 30s silently.
+  await feed.waitFor({ timeout: 10000 });
+
   let previousCount = 0;
   let stableRounds = 0;
 
   while (stableRounds < 3) {
-    await feed.evaluate((el) => (el.scrollTop = el.scrollHeight));
+    await feed.evaluate((el) => (el.scrollTop = el.scrollHeight), null, { timeout: 5000 });
     await scrollDelay();
 
     const currentCount = await page.locator('[role="article"]').count();

@@ -78,6 +78,7 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
               name: basic.name || detail.name,
               phone: detail.phone,
               address: detail.address,
+              email: detail.email || null,
               category: basic.category,
               rating: basic.rating,
               reviewCount: detail.reviewCount,
@@ -104,3 +105,20 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
 }
 
 module.exports = { run };
+
+if (require.main === module) {
+  const { Actor } = require('apify');
+  Actor.main(async () => {
+    const input = await Actor.getInput();
+    const proxyConfiguration = await Actor.createProxyConfiguration({
+      groups: ['RESIDENTIAL'],
+      countryCode: 'US',
+    });
+    const proxyUrl = await proxyConfiguration.newUrl();
+    await run({
+      ...input,
+      pushResult: (record) => Actor.pushData(record),
+      proxyUrl,
+    });
+  });
+}

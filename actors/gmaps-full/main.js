@@ -130,3 +130,43 @@ async function run({ query, geoTiles, maxResults = 120, pushResult, proxyUrl }) 
 }
 
 module.exports = { run };
+
+if (require.main === module) {
+  const { Actor } = require('apify');
+  Actor.main(async () => {
+    const input = await Actor.getInput();
+    let proxyUrl;
+    try {
+      const proxyConfiguration = await Actor.createProxyConfiguration({
+        groups: ['RESIDENTIAL'],
+        countryCode: 'US',
+        // Falls back to datacenter if residential unavailable on this plan
+      });
+      proxyUrl = await proxyConfiguration.newUrl();
+      console.log('[gmaps-full] Proxy configured:', proxyUrl.replace(/:[^@]+@/, ':***@'));
+    } catch (err) {
+      console.error('[gmaps-full] Proxy setup failed — Google Maps will likely block requests without a residential proxy:', err.message);
+    }
+    // Connectivity check — tells us if the browser + proxy can reach the internet at all
+    const { launchApify, launchLocal, newContext } = require('../../shared/browser');
+    const testBrowser = proxyUrl ? await launchApify(proxyUrl) : await launchLocal();
+    const testCtx = await newContext(testBrowser);
+    const testPage = await testCtx.newPage();
+    try {
+      await testPage.goto('https://httpbin.org/ip', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const body = await testPage.textContent('body');
+      console.log('[gmaps-full] Connectivity OK, outbound IP:', body.trim());
+    } catch (e) {
+      console.error('[gmaps-full] Connectivity test FAILED:', e.message);
+    } finally {
+      await testCtx.close();
+      await testBrowser.close();
+    }
+
+    await run({
+      ...input,
+      pushResult: (record) => Actor.pushData(record),
+      proxyUrl,
+    });
+  });
+}

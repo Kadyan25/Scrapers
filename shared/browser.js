@@ -34,9 +34,15 @@ async function launchLocal() {
  * @param {string} proxyUrl — Apify residential proxy URL
  */
 async function launchApify(proxyUrl) {
+  const parsed = new URL(proxyUrl);
+  const proxyConfig = {
+    server: `${parsed.protocol}//${parsed.hostname}:${parsed.port}`,
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+  };
   const browser = await chromium.launch({
     headless: true,
-    proxy: { server: proxyUrl },
+    proxy: proxyConfig,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
   });
   return browser;

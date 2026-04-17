@@ -13,14 +13,17 @@
         "type": "object",
         "properties": {
           "businessName": {
+            "title": "Business Name",
             "type": "string",
             "description": "Business name for GMaps and Google Search lookup"
           },
           "website": {
+            "title": "Website",
             "type": "string",
             "description": "Business website URL for direct scraping"
           },
           "email": {
+            "title": "Email",
             "type": "string",
             "description": "Business email (preserved in output, not used for lookup)"
           }
