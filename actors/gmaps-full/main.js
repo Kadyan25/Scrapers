@@ -2,7 +2,7 @@
 
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const { launchLocal, launchApify, newContext } = require('../../shared/browser');
+const { launchLocal, launchApify, newContext, blockHeavyResources } = require('../../shared/browser');
 const { searchMaps, scrollResults, collectCardData, navigateToListing, extractListingDetail } = require('../../shared/gmapsNavigator');
 const { scrapeEmailFromWebsite } = require('../../shared/websiteScraper');
 const { humanDelay } = require('../../shared/delays');
@@ -57,6 +57,7 @@ async function run({ query, geoTiles, maxResults = 120, includeSocial = false, p
       // ── Phase 2: sequential GMaps navigation, build record list ───────────
       const detailContext = await newContext(browser);
       const detailPage = await detailContext.newPage();
+      await blockHeavyResources(detailPage);
       const records = [];
 
       try {

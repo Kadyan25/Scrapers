@@ -134,7 +134,6 @@ async function extractListingBasic(card) {
  * @param {import('playwright').Page} page
  */
 async function navigateToListing(href, page) {
-  await blockHeavyResources(page);
   await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 20000 });
   await page
     .waitForSelector('[data-item-id="address"]', { timeout: 12000 })
