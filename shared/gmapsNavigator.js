@@ -1,6 +1,6 @@
 'use strict';
 
-const { newContext } = require('./browser');
+const { newContext, blockHeavyResources } = require('./browser');
 const { humanDelay, scrollDelay, pageLoadDelay } = require('./delays');
 const { cleanPhone, cleanEmail, isValidUrl } = require('./utils');
 
@@ -11,6 +11,7 @@ const { cleanPhone, cleanEmail, isValidUrl } = require('./utils');
 async function searchMaps(query, browser) {
   const context = await newContext(browser);
   const page = await context.newPage();
+  await blockHeavyResources(page);
 
   const encodedQuery = encodeURIComponent(query);
   await page.goto(`https://www.google.com/maps/search/${encodedQuery}`, {
@@ -133,6 +134,7 @@ async function extractListingBasic(card) {
  * @param {import('playwright').Page} page
  */
 async function navigateToListing(href, page) {
+  await blockHeavyResources(page);
   await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 20000 });
   await page
     .waitForSelector('[data-item-id="address"]', { timeout: 12000 })

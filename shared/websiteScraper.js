@@ -1,6 +1,6 @@
 'use strict';
 
-const { newContext } = require('./browser');
+const { newContext, blockHeavyResources } = require('./browser');
 const { extractPhones, extractEmails, cleanPhone, cleanEmail } = require('./utils');
 const { pageLoadDelay } = require('./delays');
 
@@ -73,6 +73,7 @@ function emailFromHtml(html) {
 async function scrapeInstagram(url, browser) {
   const context = await newContext(browser);
   const page = await context.newPage();
+  await blockHeavyResources(page);
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
     await pageLoadDelay();
@@ -96,6 +97,7 @@ async function scrapeInstagram(url, browser) {
 async function scrapeFacebook(url, browser) {
   const context = await newContext(browser);
   const page = await context.newPage();
+  await blockHeavyResources(page);
   try {
     const base = url.replace(/\/$/, '');
     const aboutUrl = base.includes('/about') ? base : `${base}/about`;
@@ -171,6 +173,7 @@ async function scrapeEmailFromWebsite(url, browser, { includeSocial = false } = 
 async function scrapePhoneFromGoogle(businessName, browser) {
   const context = await newContext(browser);
   const page = await context.newPage();
+  await blockHeavyResources(page);
   try {
     const query = encodeURIComponent(`${businessName} phone number`);
     await page.goto(`https://www.google.com/search?q=${query}`, {
@@ -203,6 +206,7 @@ async function scrapePhoneFromGoogle(businessName, browser) {
 async function scrapeEmailFromGoogle(businessName, browser) {
   const context = await newContext(browser);
   const page = await context.newPage();
+  await blockHeavyResources(page);
   try {
     const query = encodeURIComponent(`"${businessName}" email contact`);
     await page.goto(`https://www.google.com/search?q=${query}`, {
