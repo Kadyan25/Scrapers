@@ -31,12 +31,15 @@ async function searchMaps(query, browser) {
  * Scroll the results panel until stable or 120 listings loaded.
  * Returns an array of Locators, one per card.
  */
-async function scrollResults(page) {
+async function scrollResults(page, limit = 120) {
   const feed = page.locator('[role="feed"]');
 
   // Fail fast if the feed never appeared (consent page, CAPTCHA, blocked IP).
   // Without an explicit timeout, locator.evaluate() waits 30s silently.
   await feed.waitFor({ timeout: 10000 });
+
+  // Cap at 120 — Google Maps hard limit. Stop early if caller needs fewer.
+  const cap = Math.min(limit, 120);
 
   let previousCount = 0;
   let stableRounds = 0;
@@ -46,7 +49,7 @@ async function scrollResults(page) {
     await scrollDelay();
 
     const currentCount = await page.locator('[role="article"]').count();
-    if (currentCount >= 120) break;
+    if (currentCount >= cap) break;
 
     if (currentCount === previousCount) {
       stableRounds++;

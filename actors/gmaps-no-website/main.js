@@ -37,7 +37,7 @@ async function run({ query, geoTiles, maxResults = 120, includeSocial = false, p
 
       let listings;
       try {
-        listings = await scrollResults(listPage);
+        listings = await scrollResults(listPage, maxResults);
       } catch (err) {
         console.warn(`[gmaps-no-website] scrollResults failed for "${q}": ${err.message}`);
         await listContext.close();
