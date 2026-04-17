@@ -1,0 +1,11 @@
+{
+  "actorSpecification": 1,
+  "name": "gmaps-http",
+  "title": "GMaps HTTP Scraper (Experimental)",
+  "description": "Experimental: scrapes Google Maps using HTTP fetch + JSON-LD parsing instead of Playwright. No browser for search or detail pages — only for website email scraping.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "environmentVariables": {},
+  "dockerfile": "./Dockerfile",
+  "defaultMemoryMbytes": 1024
+}

@@ -22,6 +22,12 @@ const DEDUP_KEY_FN = {
     const addr = (r.address || '').toLowerCase().trim();
     return `name-addr:${name}|${addr}`;
   },
+  'gmaps-http': (r) => {
+    if (r.phone) return `phone:${r.phone}`;
+    const name = (r.name || '').toLowerCase().trim();
+    const addr = (r.address || '').toLowerCase().trim();
+    return `name-addr:${name}|${addr}`;
+  },
   'phone-enricher': (r) => {
     if (r.phone) return `phone:${r.phone}`;
     const biz = (r.businessName || '').toLowerCase().trim();

@@ -1,0 +1,35 @@
+{
+  "title": "GMaps HTTP Scraper Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search Query",
+      "type": "string",
+      "description": "Google Maps search query, e.g. 'dentist New York'",
+      "editor": "textfield"
+    },
+    "geoTiles": {
+      "title": "Geo Tiles (optional)",
+      "type": "array",
+      "description": "List of queries to run separately, e.g. ['dentist Manhattan', 'dentist Brooklyn']",
+      "editor": "stringList"
+    },
+    "maxResults": {
+      "title": "Max Results",
+      "type": "integer",
+      "description": "Maximum number of listings to return",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 120
+    },
+    "includeSocial": {
+      "title": "Include Social Media Scraping",
+      "type": "boolean",
+      "description": "Scrape Instagram/Facebook for email if that is the listed website. Costs extra proxy bandwidth.",
+      "default": false,
+      "editor": "checkbox"
+    }
+  },
+  "required": ["query"]
+}

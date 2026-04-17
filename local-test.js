@@ -19,6 +19,11 @@ const TEST_INPUTS = {
     maxResults: 10,
   },
 
+  'gmaps-http': {
+    query: 'auto body shop Brooklyn NY',
+    maxResults: 5,
+  },
+
   'phone-enricher': {
     records: [
       { businessName: 'Salerno Auto Body Shop Brooklyn' },
