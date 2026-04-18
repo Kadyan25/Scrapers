@@ -1,0 +1,11 @@
+{
+  "actorSpecification": 1,
+  "name": "gmaps-http-no-website",
+  "title": "GMaps HTTP No-Website Scraper",
+  "description": "Finds businesses with no real website using Google Maps HTTP API. Returns listings with null URL or social-only profiles (Instagram, Facebook). Email scraped from social profiles when available.",
+  "version": "0.1",
+  "buildTag": "latest",
+  "environmentVariables": {},
+  "dockerfile": "./Dockerfile",
+  "defaultMemoryMbytes": 1024
+}

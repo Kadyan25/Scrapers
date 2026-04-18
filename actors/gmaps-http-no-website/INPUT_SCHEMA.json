@@ -1,0 +1,35 @@
+{
+  "title": "GMaps HTTP No-Website Scraper Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "query": {
+      "title": "Search Query",
+      "type": "string",
+      "description": "Google Maps search query, e.g. 'dentist New York'",
+      "editor": "textfield"
+    },
+    "geoTiles": {
+      "title": "Geo Tiles (optional)",
+      "type": "array",
+      "description": "List of queries to run separately, e.g. ['dentist Manhattan', 'dentist Brooklyn']. Use this to get more than 20 unique results.",
+      "editor": "stringList"
+    },
+    "maxResults": {
+      "title": "Max Results",
+      "type": "integer",
+      "description": "Maximum number of no-website listings to return per query",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 120
+    },
+    "includeSocial": {
+      "title": "Scrape Social Profiles",
+      "type": "boolean",
+      "description": "Attempt to extract email and phone from Instagram/Facebook profiles listed as the business website. Requires browser + proxy.",
+      "default": true,
+      "editor": "checkbox"
+    }
+  },
+  "required": ["query"]
+}

@@ -24,6 +24,12 @@ const TEST_INPUTS = {
     maxResults: 5,
   },
 
+  'gmaps-http-no-website': {
+    query: 'dentist Brooklyn NY',
+    maxResults: 20,
+    includeSocial: false,   // set true to test browser social scraping
+  },
+
   'phone-enricher': {
     records: [
       { businessName: 'Salerno Auto Body Shop Brooklyn' },
@@ -42,7 +48,7 @@ async function main() {
 
   const input = TEST_INPUTS[TEST_SCRAPER];
   if (!input) {
-    console.error(`Unknown TEST_SCRAPER: "${TEST_SCRAPER}". Options: gmaps-full, gmaps-no-website, phone-enricher`);
+    console.error(`Unknown TEST_SCRAPER: "${TEST_SCRAPER}". Options: gmaps-full, gmaps-no-website, gmaps-http, gmaps-http-no-website, phone-enricher`);
     process.exit(1);
   }
 
